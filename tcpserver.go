@@ -4,11 +4,13 @@ package main
     TODO:
     o oop
     o log
-    o cmd helper
+    o chunk i/o
+    o keep alive
 */
 
 import (
     "bytes"
+    "flag"
     "fmt"
     "io"
     "log"
@@ -25,18 +27,84 @@ type Config struct {
     CmdArgs []string
 }
 
+type Option struct {
+    Addr string
+    Cmd string
+}
+
+var DEBUG bool
+var opt Option
+
+func init() {
+    const (
+        verbose_usage = "Enable verbose"
+        verbose_default_val = false
+    )
+
+    flag.BoolVar(&DEBUG, "v", verbose_default_val, verbose_usage)
+    flag.BoolVar(&DEBUG, "verbose", verbose_default_val, verbose_usage)
+
+    flag.StringVar(&opt.Addr, "addr", "127.0.0.1:3131", "Ip address to bind")
+    flag.StringVar(&opt.Cmd, "cmd", "", "Command to run")
+}
+
+
 func main() {
+    flag.Parse()
+    debug(opt)
+
+    conf := get_conf()
+    listener := get_listener(conf)
+    run(conf, listener)
+}
+
+func get_conf() Config {
     conf := Config{
         Bind: "127.0.0.1",
         Port: "3000",
-        Cmd: "tr",
-        CmdArgs: []string{"[::lower:]", "[:upper:]"},
+        Cmd: "",
+        CmdArgs: []string{},
     }
-    debug(fmt.Sprintf("Config: %s", conf))
 
-    // listen to a port for a tcp connection
-    listener := get_listener(conf)
-    run(conf, listener)
+    if len(opt.Addr)>0 {
+        conf.Bind, conf.Port = parse_opt_addr(opt.Addr)
+    }
+
+    conf.Cmd, conf.CmdArgs = parse_opt_cmd(opt.Cmd)
+
+    debug(fmt.Sprintf("Config: %s", conf))
+    return conf
+}
+
+func parse_opt_addr(addr string) (string, string) {
+    addrs := strings.Split(addr, ":")
+    if len(addrs) != 2 {
+        print_usage()
+        log.Fatal("Unable to parse addr")
+    }
+    return addrs[0], addrs[1]
+}
+
+func parse_opt_cmd(cmd string) (string, []string) {
+    cmds := strings.Split(cmd, " ")
+    if len(cmd) == 0 || len(cmds) < 1 {
+        print_usage()
+        log.Fatal("Unable to parse cmd. cmd is required.")
+    }
+
+    args := make([]string, 0)
+    for _, arg := range cmds[1:] {
+        if arg == "" || arg == " " { continue; }
+        args = append(args, arg)
+    }
+
+    return cmds[0], args
+}
+
+func print_usage() {
+    fmt.Println("Usage: tcpserver [--addr 0.0.0.0:3000] --cmd 'tr a-z A-Z'")
+    flag.PrintDefaults()
+    fmt.Println()
 }
 
 func get_listener(conf Config) net.Listener {
@@ -111,7 +179,7 @@ func handle_conn(conn net.Conn, conf Config) {
 
 func run_cmd(cmd *exec.Cmd, conn net.Conn, str string) {
     from := fmt.Sprintf("%s ", conn.RemoteAddr())
-    debug(fmt.Sprintf("echo '%s' |", str))
+    debug(fmt.Sprintf("echo '%s' | %s", str, opt.Cmd))
 
     cmd.Stdin = strings.NewReader(str)
     cmd.Stdout = conn
@@ -130,6 +198,7 @@ func run_cmd(cmd *exec.Cmd, conn net.Conn, str string) {
 }
 
 func debug(log interface{}) {
+    if !DEBUG { return; }
     fmt.Fprintf(os.Stderr, "[debug] %s\n", log)
 }
 
