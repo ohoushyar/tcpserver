@@ -62,7 +62,7 @@ func get_conf() Config {
     conf := Config{
         Bind: "127.0.0.1",
         Port: "3000",
-        Cmd: "",
+        Cmd: "tee",
         CmdArgs: []string{},
     }
 
@@ -70,7 +70,9 @@ func get_conf() Config {
         conf.Bind, conf.Port = parse_opt_addr(opt.Addr)
     }
 
-    conf.Cmd, conf.CmdArgs = parse_opt_cmd(opt.Cmd)
+    if len(opt.Cmd)>0 {
+        conf.Cmd, conf.CmdArgs = parse_opt_cmd(opt.Cmd)
+    }
 
     debug(fmt.Sprintf("Config: %s", conf))
     return conf
@@ -87,9 +89,9 @@ func parse_opt_addr(addr string) (string, string) {
 
 func parse_opt_cmd(cmd string) (string, []string) {
     cmds := strings.Split(cmd, " ")
-    if len(cmd) == 0 || len(cmds) < 1 {
+    if len(cmds[0]) == 0 || len(cmds) < 1 {
         print_usage()
-        log.Fatal("Unable to parse cmd. cmd is required.")
+        log.Fatal("Unable to parse cmd. cmd is required!")
     }
 
     args := make([]string, 0)
