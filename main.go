@@ -15,7 +15,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"os"
 	"os/exec"
 	"strings"
 )
@@ -50,7 +49,6 @@ func init() {
 
 func main() {
 	flag.Parse()
-	debug("env var GOPATH: [%s]", os.Getenv("GOPATH"))
 	debug("%s", opt)
 
 	conf := getConf()
@@ -125,7 +123,7 @@ func run(conf config, listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			errr(fmt.Sprintf("Something went wrong while connecting! ERROR: %v", err))
+			errr("Something went wrong while connecting! ERROR: %v", err)
 		} else {
 			go handleConn(conn, conf)
 		}
@@ -174,7 +172,7 @@ func handleConn(conn net.Conn, conf config) {
 				debug(from + "XX ... connection closed")
 				return
 			}
-			errr(from + fmt.Sprintf("!! Something happened while reading! ERROR: [%v]", err))
+			errr("%s!! Something happened while reading! ERROR: [%v]", from, err)
 			return
 		}
 	}
@@ -190,7 +188,7 @@ func runCmd(cmd *exec.Cmd, conn net.Conn, str string) {
 
 	err := cmd.Run()
 	if err != nil {
-		errr(from + fmt.Sprintf("!! Failed to exec! ERROR: %s\n", err))
+		errr("%s!! Failed to exec! ERROR: %s\n", from, err)
 		errstr := strings.NewReader(fmt.Sprintf("err: %s\n", err))
 		io.Copy(conn, errstr)
 		return
@@ -208,6 +206,7 @@ func debug(pattern string, args ...interface{}) {
 	log.Printf(pattern, args...)
 }
 
-func errr(log interface{}) {
-	fmt.Fprintf(os.Stderr, "[error] %s\n", log)
+func errr(pattern string, args ...interface{}) {
+	pattern = "[error] " + pattern
+	log.Printf(pattern, args...)
 }
