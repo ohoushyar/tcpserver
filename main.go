@@ -3,8 +3,6 @@ package main
 /*
    TODO:
    o oop
-   o log
-   o chunk i/o
    o keep alive
 */
 
@@ -172,7 +170,7 @@ func handleConn(conn net.Conn, conf config) {
 }
 
 func runCmd(cmd *exec.Cmd, conn net.Conn, str string) {
-	from := fmt.Sprintf("%s ", conn.RemoteAddr())
+	from := fmt.Sprintf("%s", conn.RemoteAddr())
 	debug("echo '%s' | %s", str, opt.Cmd)
 
 	cmd.Stdin = strings.NewReader(str)
@@ -181,14 +179,14 @@ func runCmd(cmd *exec.Cmd, conn net.Conn, str string) {
 
 	err := cmd.Run()
 	if err != nil {
-		errr("%s!! Failed to exec! ERROR: %s\n", from, err)
+		errr("%s !! Failed to exec! ERROR: %s\n", from, err)
 		errstr := strings.NewReader(fmt.Sprintf("err: %s\n", err))
 		io.Copy(conn, errstr)
 		return
 	}
 
-	debug(from + "!! ... Ran cmd")
-	debug("%s", cmd.ProcessState)
+	debug("%s <- ... Ran cmd", from)
+	debug("!! ... %s", cmd.ProcessState)
 }
 
 func debug(pattern string, args ...interface{}) {
