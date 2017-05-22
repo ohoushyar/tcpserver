@@ -9,7 +9,7 @@ package main
 */
 
 import (
-	"bytes"
+	"bufio"
 	"flag"
 	"fmt"
 	"io"
@@ -147,35 +147,28 @@ func handleConn(conn net.Conn, conf config) {
 	from := fmt.Sprintf("%s ", remote)
 	debug("Accepted connection from: %v", remote)
 
-	var buff bytes.Buffer
-	arr := make([]byte, 50)
-	prev := make([]byte, 50)
-	for {
-		prev = arr
-		n, err := conn.Read(arr)
-		if n > 0 {
-			debug("%s-> Read bytes: %v", from, n)
-			debug("%s-> data: [%s]", from, arr[:n])
-
-			if prev[0] == '\r' && arr[0] == '\r' {
-				str := string(buff.Bytes())
-				runCmd(cmd, conn, str)
-				debug(from + "XX ... connection closed")
-				return
-			}
-
-			buff.Write(arr[:n])
-		}
-
-		if err != nil {
-			if err == io.EOF {
-				debug(from + "XX ... connection closed")
-				return
-			}
-			errr("%s!! Something happened while reading! ERROR: [%v]", from, err)
+	cnt := 0
+	var prev string
+	var str string
+	sc := bufio.NewScanner(conn)
+	for sc.Scan() {
+		curr := sc.Text()
+		debug("%s-> data: [%s]", from, curr)
+		if cnt > 0 &&
+			strings.Compare(prev, "") == 0 &&
+			strings.Compare(curr, prev) == 0 {
+			runCmd(cmd, conn, str)
 			return
 		}
+		str += fmt.Sprintf("%s\n", curr)
+		prev = curr
+		cnt++
 	}
+	if err := sc.Err(); err != nil {
+		errr("reading err [%v]", err)
+	}
+
+	debug(from + "XX ... connection closed")
 }
 
 func runCmd(cmd *exec.Cmd, conn net.Conn, str string) {
