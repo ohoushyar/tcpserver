@@ -13,20 +13,23 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 type config struct {
-	Bind    string
-	Port    string
-	Cmd     string
-	CmdArgs []string
+	Addr      string
+	Cmd       string
+	CmdArgs   []string
+	IOTimeout time.Duration
 }
 
 type option struct {
-	Addr string
-	Cmd  string
+	Addr      string
+	Cmd       string
+	IOTimeout time.Duration
 }
 
 var deb bool
@@ -43,6 +46,7 @@ func init() {
 
 	flag.StringVar(&opt.Addr, "addr", "127.0.0.1:3131", "Ip address to bind")
 	flag.StringVar(&opt.Cmd, "cmd", "", "Command to run")
+	flag.DurationVar(&opt.IOTimeout, "io-timeout", 0, "IO timeout (default: OS default timeout)")
 }
 
 func main() {
@@ -56,31 +60,25 @@ func main() {
 
 func getConf() config {
 	conf := config{
-		Bind:    "127.0.0.1",
-		Port:    "3000",
+		Addr:    "127.0.0.1:3000",
 		Cmd:     "tee",
 		CmdArgs: []string{},
 	}
 
 	if len(opt.Addr) > 0 {
-		conf.Bind, conf.Port = parseOptAddr(opt.Addr)
+		conf.Addr = opt.Addr
 	}
 
 	if len(opt.Cmd) > 0 {
 		conf.Cmd, conf.CmdArgs = parseOptCmd(opt.Cmd)
 	}
 
+	if opt.IOTimeout > 0 {
+		conf.IOTimeout = opt.IOTimeout
+	}
+
 	debug("Config: %s", conf)
 	return conf
-}
-
-func parseOptAddr(addr string) (string, string) {
-	addrs := strings.Split(addr, ":")
-	if len(addrs) != 2 {
-		printUsage()
-		log.Fatal("Unable to parse addr")
-	}
-	return addrs[0], addrs[1]
 }
 
 func parseOptCmd(cmd string) (string, []string) {
@@ -102,16 +100,15 @@ func parseOptCmd(cmd string) (string, []string) {
 }
 
 func printUsage() {
-	fmt.Println("Usage: tcpserver [--addr 0.0.0.0:3000] --cmd 'tr a-z A-Z'")
+	fmt.Printf("Usage: %s [-v|--verbose] [-io-timeout 10s] [--addr [0.0.0.0]:3000] --cmd 'tr a-z A-Z'\n", os.Args[0])
 	flag.PrintDefaults()
 	fmt.Println()
 }
 
 func getListener(conf config) net.Listener {
-	addr := conf.Bind + ":" + conf.Port
-	ln, err := net.Listen("tcp", addr)
+	ln, err := net.Listen("tcp", conf.Addr)
 	if err != nil {
-		log.Fatal(fmt.Sprintf("Unable to listen to address: [%v] ERROR: %v", addr, err))
+		log.Fatal("Unable to listen to address: ", err)
 	}
 	debug("Listenning to: %v", ln.Addr())
 	return ln
@@ -120,9 +117,15 @@ func getListener(conf config) net.Listener {
 func run(conf config, listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
+
 		if err != nil {
 			errr("Something went wrong while connecting! ERROR: %v", err)
 		} else {
+			// set the i/o timeout
+			if conf.IOTimeout > 0 {
+				deadline := time.Now().Add(conf.IOTimeout)
+				conn.SetReadDeadline(deadline)
+			}
 			go handleConn(conn, conf)
 		}
 	}
