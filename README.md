@@ -1,6 +1,6 @@
 # tcpserver
 
-A simple TCP server that reads blank-line-framed input and pipes it to a command.
+A simple TCP server that reads blank-line-framed input and pipes it to a command. It runs as a single process and handles multiple connections concurrently.
 
 ```sh
 tcpserver --cmd 'tr a-z A-Z'
