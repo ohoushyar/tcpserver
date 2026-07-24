@@ -58,7 +58,7 @@ func parseFlags(args []string) (config, error) {
 	fs.BoolVar(&cfg.verbose, "verbose", false, "Enable verbose")
 	fs.StringVar(&cfg.addr, "addr", "127.0.0.1:3131", "IP address to bind")
 	fs.StringVar(&cmdStr, "cmd", "", "Command to run")
-	fs.DurationVar(&cfg.ioTimeout, "io-timeout", 0, "IO timeout (default: OS default timeout)")
+	fs.DurationVar(&cfg.ioTimeout, "io-timeout", 0, "IO timeout as a duration string (e.g. 2s, 500ms; default: no timeout)")
 
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
