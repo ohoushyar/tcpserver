@@ -31,7 +31,7 @@ Flags are parsed with the Go `flag` package. Unknown flags and parse errors exit
 
 ### `--cmd` parsing
 
-The `--cmd` value is split on ASCII spaces (` `):
+The `--cmd` value is trimmed of leading/trailing Unicode whitespace, then split on ASCII spaces (` `):
 
 - The first non-empty token is the executable path/name.
 - Remaining tokens are arguments; empty tokens from consecutive spaces are skipped.

@@ -75,6 +75,7 @@ func parseFlags(args []string) (config, error) {
 }
 
 func parseCmd(cmd string) (string, []string, error) {
+	cmd = strings.TrimSpace(cmd)
 	cmds := strings.Split(cmd, " ")
 	if cmds[0] == "" {
 		return "", nil, errors.New("cmd is required")

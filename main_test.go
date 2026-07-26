@@ -35,6 +35,12 @@ func TestParseCmd(t *testing.T) {
 			wantArgs: []string{"hello"},
 		},
 		{
+			name:     "trims leading and trailing spaces",
+			input:    "  tr a-z A-Z  ",
+			wantCmd:  "tr",
+			wantArgs: []string{"a-z", "A-Z"},
+		},
+		{
 			name:    "empty",
 			input:   "",
 			wantErr: true,
@@ -42,6 +48,11 @@ func TestParseCmd(t *testing.T) {
 		{
 			name:    "whitespace only",
 			input:   " ",
+			wantErr: true,
+		},
+		{
+			name:    "tabs and spaces only",
+			input:   " \t  ",
 			wantErr: true,
 		},
 	}
