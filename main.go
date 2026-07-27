@@ -23,7 +23,8 @@ type config struct {
 	cmd       string
 	cmdArgs   []string
 	ioTimeout time.Duration
-	verbose   bool
+	quiet     bool
+	debug     bool
 }
 
 func main() {
@@ -37,7 +38,10 @@ func main() {
 	}
 
 	level := slog.LevelInfo
-	if cfg.verbose {
+	if cfg.quiet {
+		level = slog.LevelWarn
+	}
+	if cfg.debug {
 		level = slog.LevelDebug
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
@@ -54,8 +58,9 @@ func parseFlags(args []string) (config, error) {
 
 	var cfg config
 	var cmdStr string
-	fs.BoolVar(&cfg.verbose, "v", false, "Enable verbose")
-	fs.BoolVar(&cfg.verbose, "verbose", false, "Enable verbose")
+	fs.BoolVar(&cfg.quiet, "q", false, "Set log level to warn")
+	fs.BoolVar(&cfg.quiet, "quiet", false, "Set log level to warn")
+	fs.BoolVar(&cfg.debug, "debug", false, "Set log level to debug")
 	fs.StringVar(&cfg.addr, "addr", "127.0.0.1:3131", "IP address to bind")
 	fs.StringVar(&cmdStr, "cmd", "", "Command to run")
 	fs.DurationVar(&cfg.ioTimeout, "io-timeout", 0, "IO timeout as a duration string (e.g. 2s, 500ms; default: no timeout)")
@@ -92,7 +97,7 @@ func parseCmd(cmd string) (string, []string, error) {
 }
 
 func printUsage(fs *flag.FlagSet) {
-	fmt.Fprintf(fs.Output(), "Usage: %s [-v|--verbose] [-io-timeout 10s] [--addr 127.0.0.1:3131] --cmd 'tr a-z A-Z'\n", fs.Name())
+	fmt.Fprintf(fs.Output(), "Usage: %s [-q|--quiet] [--debug] [-io-timeout 10s] [--addr 127.0.0.1:3131] --cmd 'tr a-z A-Z'\n", fs.Name())
 	fs.PrintDefaults()
 	fmt.Fprintln(fs.Output())
 }
@@ -160,9 +165,40 @@ func newCmd(cfg config) *exec.Cmd {
 func handleConn(conn net.Conn, cfg config, log *slog.Logger) {
 	defer conn.Close()
 
+	start := time.Now()
 	remote := conn.RemoteAddr()
 	log = log.With("remote", remote)
 	log.Debug("accepted connection")
+
+	var (
+		inputLen int
+		recvDur  time.Duration
+		procDur  time.Duration
+		state    string
+		cmdErr   error
+		readErr  error
+		ran      bool
+	)
+	defer func() {
+		args := []any{
+			"state", state,
+			"inputLen", inputLen,
+			"process", procDur,
+			"recv", recvDur,
+			"duration", time.Since(start),
+		}
+		if !ran {
+			if readErr == nil {
+				log.Debug("incomplete connection", args...)
+			}
+			return
+		}
+		if cmdErr != nil {
+			log.Warn("handled connection", append(args, "err", cmdErr)...)
+			return
+		}
+		log.Info("handled connection", args...)
+	}()
 
 	cmd := newCmd(cfg)
 	log.Debug("cmd", "args", cmd.Args)
@@ -172,12 +208,24 @@ func handleConn(conn net.Conn, cfg config, log *slog.Logger) {
 		prev string
 		b    strings.Builder
 	)
+	recvStart := time.Now()
 	sc := bufio.NewScanner(conn)
 	for sc.Scan() {
 		curr := sc.Text()
-		log.Debug("data", "line", curr)
+		log.Debug("data", "lineLen", len(curr))
 		if cnt > 0 && prev == "" && curr == prev {
-			runCmd(cmd, conn, b.String(), log)
+			recvDur = time.Since(recvStart)
+			input := b.String()
+			inputLen = len(input)
+
+			ran = true
+			procStart := time.Now()
+			var ps *os.ProcessState
+			ps, cmdErr = runCmd(cmd, conn, input, log)
+			procDur = time.Since(procStart)
+			if ps != nil {
+				state = ps.String()
+			}
 			return
 		}
 		b.WriteString(curr)
@@ -185,14 +233,16 @@ func handleConn(conn net.Conn, cfg config, log *slog.Logger) {
 		prev = curr
 		cnt++
 	}
+	recvDur = time.Since(recvStart)
+	inputLen = b.Len()
 	if err := sc.Err(); err != nil {
+		readErr = err
 		log.Error("reading", "err", err)
 	}
-	log.Debug("connection closed")
 }
 
-func runCmd(cmd *exec.Cmd, conn net.Conn, input string, log *slog.Logger) {
-	log.Debug("running command", "input", input, "cmd", cmd.Args)
+func runCmd(cmd *exec.Cmd, conn net.Conn, input string, log *slog.Logger) (*os.ProcessState, error) {
+	log.Debug("running command", "inputLen", len(input), "cmd", cmd.Args)
 
 	cmd.Stdin = strings.NewReader(input)
 	cmd.Stdout = conn
@@ -201,8 +251,9 @@ func runCmd(cmd *exec.Cmd, conn net.Conn, input string, log *slog.Logger) {
 	if err := cmd.Run(); err != nil {
 		log.Error("command failed", "err", err)
 		_, _ = io.Copy(conn, strings.NewReader(fmt.Sprintf("err: %s\n", err)))
-		return
+		return cmd.ProcessState, err
 	}
 
 	log.Debug("command finished", "state", cmd.ProcessState)
+	return cmd.ProcessState, nil
 }

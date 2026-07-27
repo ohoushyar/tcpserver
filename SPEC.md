@@ -27,7 +27,8 @@ Flags are parsed with the Go `flag` package. Unknown flags and parse errors exit
 | `--cmd` | string | _(empty)_ | **yes** | Command and arguments, space-separated |
 | `--addr` | string | `127.0.0.1:3131` | no | TCP listen address (`host:port`) |
 | `--io-timeout` | duration | `0` (no timeout) | no | Read deadline duration string (e.g. `2s`, `500ms`) |
-| `-v` / `--verbose` | bool | `false` | no | Enable debug logging |
+| `-q` / `--quiet` | bool | `false` | no | Set log level to warn |
+| `--debug` | bool | `false` | no | Set log level to debug |
 
 ### `--cmd` parsing
 
@@ -50,15 +51,17 @@ Examples:
 
 - Logs go to **stderr** via `log/slog` text handler.
 - Default level: `INFO`.
-- With `-v` / `--verbose`: `DEBUG`.
+- With `-q` / `--quiet`: `WARN`.
+- With `--debug`: `DEBUG` (overrides `--quiet` if both are set).
 - Connection handlers add a `remote` attribute (peer address).
 
 Notable log events:
 
 | Level | When |
 |-------|------|
-| INFO | Listening started (`addr`) |
-| DEBUG | Config dump, accept, per-line data, command start/finish |
+| INFO | Listening started (`addr`); successful connection summary (`remote`, `state`, `inputLen`, `process`, `recv`, `duration`) |
+| WARN | Failed command connection summary (same fields plus `err`) |
+| DEBUG | Config dump, accept, per-line length (`lineLen`), command start (`inputLen`) / finish; incomplete connection summary (same fields, command not run) |
 | ERROR | Accept failure (non-shutdown), read errors, command failures, fatal server errors |
 
 ## Networking
@@ -130,7 +133,7 @@ If the peer closes the connection (or a read error occurs) **before** two consec
 
 - The command is **not** run.
 - Accumulated data is discarded.
-- Read errors are logged at ERROR; clean EOF is logged at DEBUG as connection closed.
+- Read errors are logged at ERROR; incomplete connections (EOF before a complete frame) are logged at DEBUG with the connection summary fields.
 
 ### Connection lifetime
 
