@@ -92,11 +92,11 @@ When `--io-timeout` is greater than zero, immediately after accept the server ca
 
 Sequence that completes a message:
 
-```text
-<one or more content lines, each ending in \n>
+~~~text
+<at least one line (possibly empty), each ending in \n>
 \n          ← first blank line (empty line)
 \n          ← second blank line (empty line) → run command
-```
+~~~
 
 Example bytes that trigger processing of `Hi there!`:
 
