@@ -96,7 +96,8 @@ func TestParseFlags(t *testing.T) {
 		{
 			name: "all flags",
 			args: []string{
-				"-v",
+				"-q",
+				"--debug",
 				"--addr", "0.0.0.0:4000",
 				"--cmd", "tee",
 				"--io-timeout", "5s",
@@ -106,7 +107,28 @@ func TestParseFlags(t *testing.T) {
 				cmd:       "tee",
 				cmdArgs:   []string{},
 				ioTimeout: 5 * time.Second,
-				verbose:   true,
+				quiet:     true,
+				debug:     true,
+			},
+		},
+		{
+			name: "quiet long form",
+			args: []string{"--quiet", "--cmd", "tee"},
+			want: config{
+				addr:    "127.0.0.1:3131",
+				cmd:     "tee",
+				cmdArgs: []string{},
+				quiet:   true,
+			},
+		},
+		{
+			name: "debug only",
+			args: []string{"--debug", "--cmd", "tee"},
+			want: config{
+				addr:    "127.0.0.1:3131",
+				cmd:     "tee",
+				cmdArgs: []string{},
+				debug:   true,
 			},
 		},
 		{
@@ -146,8 +168,11 @@ func TestParseFlags(t *testing.T) {
 			if got.ioTimeout != tt.want.ioTimeout {
 				t.Errorf("ioTimeout = %v, want %v", got.ioTimeout, tt.want.ioTimeout)
 			}
-			if got.verbose != tt.want.verbose {
-				t.Errorf("verbose = %v, want %v", got.verbose, tt.want.verbose)
+			if got.quiet != tt.want.quiet {
+				t.Errorf("quiet = %v, want %v", got.quiet, tt.want.quiet)
+			}
+			if got.debug != tt.want.debug {
+				t.Errorf("debug = %v, want %v", got.debug, tt.want.debug)
 			}
 		})
 	}

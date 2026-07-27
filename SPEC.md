@@ -27,7 +27,8 @@ Flags are parsed with the Go `flag` package. Unknown flags and parse errors exit
 | `--cmd` | string | _(empty)_ | **yes** | Command and arguments, space-separated |
 | `--addr` | string | `127.0.0.1:3131` | no | TCP listen address (`host:port`) |
 | `--io-timeout` | duration | `0` (no timeout) | no | Read deadline duration string (e.g. `2s`, `500ms`) |
-| `-v` / `--verbose` | bool | `false` | no | Enable debug logging |
+| `-q` / `--quiet` | bool | `false` | no | Set log level to warn |
+| `--debug` | bool | `false` | no | Set log level to debug |
 
 ### `--cmd` parsing
 
@@ -50,7 +51,8 @@ Examples:
 
 - Logs go to **stderr** via `log/slog` text handler.
 - Default level: `INFO`.
-- With `-v` / `--verbose`: `DEBUG`.
+- With `-q` / `--quiet`: `WARN`.
+- With `--debug`: `DEBUG` (overrides `--quiet` if both are set).
 - Connection handlers add a `remote` attribute (peer address).
 
 Notable log events:

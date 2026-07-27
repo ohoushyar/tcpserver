@@ -23,7 +23,8 @@ type config struct {
 	cmd       string
 	cmdArgs   []string
 	ioTimeout time.Duration
-	verbose   bool
+	quiet     bool
+	debug     bool
 }
 
 func main() {
@@ -37,7 +38,10 @@ func main() {
 	}
 
 	level := slog.LevelInfo
-	if cfg.verbose {
+	if cfg.quiet {
+		level = slog.LevelWarn
+	}
+	if cfg.debug {
 		level = slog.LevelDebug
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
@@ -54,8 +58,9 @@ func parseFlags(args []string) (config, error) {
 
 	var cfg config
 	var cmdStr string
-	fs.BoolVar(&cfg.verbose, "v", false, "Enable verbose")
-	fs.BoolVar(&cfg.verbose, "verbose", false, "Enable verbose")
+	fs.BoolVar(&cfg.quiet, "q", false, "Set log level to warn")
+	fs.BoolVar(&cfg.quiet, "quiet", false, "Set log level to warn")
+	fs.BoolVar(&cfg.debug, "debug", false, "Set log level to debug")
 	fs.StringVar(&cfg.addr, "addr", "127.0.0.1:3131", "IP address to bind")
 	fs.StringVar(&cmdStr, "cmd", "", "Command to run")
 	fs.DurationVar(&cfg.ioTimeout, "io-timeout", 0, "IO timeout as a duration string (e.g. 2s, 500ms; default: no timeout)")
@@ -92,7 +97,7 @@ func parseCmd(cmd string) (string, []string, error) {
 }
 
 func printUsage(fs *flag.FlagSet) {
-	fmt.Fprintf(fs.Output(), "Usage: %s [-v|--verbose] [-io-timeout 10s] [--addr 127.0.0.1:3131] --cmd 'tr a-z A-Z'\n", fs.Name())
+	fmt.Fprintf(fs.Output(), "Usage: %s [-q|--quiet] [--debug] [-io-timeout 10s] [--addr 127.0.0.1:3131] --cmd 'tr a-z A-Z'\n", fs.Name())
 	fs.PrintDefaults()
 	fmt.Fprintln(fs.Output())
 }
